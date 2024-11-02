@@ -1,0 +1,88 @@
+void EagleView::paintEvent(QPaintEvent *event)
+{
+	QGraphicsScene *scene = m_mainView->scene();
+	// 设置图像大小与场景图元边界大小一致
+	QRect itemsBoundingRect = m_mainView->tilesBoundingRect();
+		
+	int viewW = viewport()->width();
+	int viewH = viewport()->height();
+	double scaleW = itemsBoundingRect.width() * 1.0 / viewW;
+	double scaleH = itemsBoundingRect.height() * 1.0 / viewH;
+	m_backgroundScale = qMax(scaleW, scaleH);
+	double pixmapW = itemsBoundingRect.width() / m_backgroundScale;
+	double pixmapH = itemsBoundingRect.height() / m_backgroundScale;
+
+	m_backgroundRect = QRectF(0, 0, pixmapW, pixmapH);
+	if (pixmapW < viewW)
+		m_backgroundRect.moveLeft((viewW - pixmapW) / 2);
+	if (pixmapH < viewH)
+		m_backgroundRect.moveTop((viewH - pixmapH) / 2);
+
+	// 渲染图像
+	QPixmap	pixmap(pixmapW, pixmapH);
+	pixmap.fill(Qt::red);
+	QPainter painter;
+	painter.begin(viewport());
+	painter.setRenderHints(/*QPainter::Antialiasing | */QPainter::/*HighQualityAntialiasing*/SmoothPixmapTransform);
+	scene->render(&painter, m_backgroundRect, itemsBoundingRect);
+
+	// 范围指示器
+	int mainViewW = m_mainView->viewport()->width();
+	int mainViewH = m_mainView->viewport()->height();
+	scaleW = mainViewW * 1.0 / itemsBoundingRect.width();
+	scaleH = mainViewH * 1.0 / itemsBoundingRect.height();
+	double scale = qMax(scaleW, scaleH);
+	if (scale >= 1)
+	{// 当比率>=1时，矩形导航框为整个鹰眼视图中的背景图元大小
+		QPointF viewportTopLeftToScenePos = m_mainView->mapToScene(QPoint(0, 0));
+		// 调整位置
+		double x, y, w, h;
+		if (scaleW >= 1)
+		{
+			w = m_backgroundRect.width();
+			x = m_backgroundRect.x() + 1;
+		}
+		else
+		{
+			w = pixmapW * scaleW;
+			double offsetX = m_backgroundRect.x();
+			x = offsetX + (viewportTopLeftToScenePos.x() - itemsBoundingRect.x()) / itemsBoundingRect.width() * pixmapW;
+		}
+
+		if (scaleH >= 1)
+		{
+			h = m_backgroundRect.height();
+			y = m_backgroundRect.y();
+		}
+		else
+		{
+			h = pixmapH * scaleH;
+			double offsetY = m_backgroundRect.y();
+			y = offsetY + (viewportTopLeftToScenePos.y() - itemsBoundingRect.y()) / itemsBoundingRect.height() * pixmapH;
+		}
+
+		m_indicatorRect = QRectF(x, y, w - 1, h);
+		painter.setPen(Qt::red);
+		painter.drawRect(m_indicatorRect);
+
+		m_restrictRect = m_backgroundRect.adjusted(w / 2, h / 2, -w / 2, -h / 2);
+	}
+	else// scale < 1
+	{// 当比率<1时，矩形导航框为主视窗中图元占整个场景图元的比率所对应的鹰眼视图大小
+		QPointF viewportTopLeftToScenePos = m_mainView->mapToScene(QPoint(0, 0));
+		// 调整位置
+		double offsetX = m_backgroundRect.x();
+		double offsetY = m_backgroundRect.y();
+		double x = offsetX + (viewportTopLeftToScenePos.x() - itemsBoundingRect.x()) / itemsBoundingRect.width() * pixmapW;
+		double y = offsetY + (viewportTopLeftToScenePos.y() - itemsBoundingRect.y()) / itemsBoundingRect.height() * pixmapH;
+		double w = pixmapW * scaleW;
+		double h = pixmapH * scaleH;
+		m_indicatorRect = QRectF(x, y, w - 1, h);
+		painter.setPen(Qt::red);
+		painter.drawRect(m_indicatorRect);
+
+		m_restrictRect = m_backgroundRect.adjusted(w / 2, h / 2, -w / 2, -h / 2);
+	}
+
+	QGraphicsView::paintEvent(event);
+}
